@@ -36,30 +36,29 @@ export function buildCSV(game: SavedGame): string {
   return lines.join('\n');
 }
 
-export function downloadCSV(game: SavedGame): void {
+export async function downloadCSV(game: SavedGame): Promise<void> {
   const csv = buildCSV(game);
   const filename = `${game.name.replace(/\s+/g, '_')}_stats.csv`;
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const file = new File([blob], filename, { type: 'text/csv' });
 
-  if (isIOS) {
-    // iOS Safari doesn't support <a download> — open as data URI to trigger share sheet
-    const dataUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
-    const a = document.createElement('a');
-    a.href = dataUri;
-    a.target = '_blank';
-    a.rel = 'noopener noreferrer';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  } else {
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  // Use Web Share API on iOS — preserves filename and triggers native share sheet
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: filename });
+      return;
+    } catch {
+      // User cancelled or share failed — fall through to desktop method
+    }
   }
+
+  // Desktop fallback
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
