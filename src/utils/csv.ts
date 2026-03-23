@@ -38,11 +38,28 @@ export function buildCSV(game: SavedGame): string {
 
 export function downloadCSV(game: SavedGame): void {
   const csv = buildCSV(game);
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${game.name.replace(/\s+/g, '_')}_stats.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  const filename = `${game.name.replace(/\s+/g, '_')}_stats.csv`;
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+
+  if (isIOS) {
+    // iOS Safari doesn't support <a download> — open as data URI to trigger share sheet
+    const dataUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+    const a = document.createElement('a');
+    a.href = dataUri;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } else {
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
 }
